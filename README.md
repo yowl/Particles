@@ -7,5 +7,5 @@ https://github.com/dotnet/runtimelab/tree/feature/NativeAOT-LLVM
 
 Thanks, to all on the runtime team for helping with NativeAOT-LLVM and the emscripten team for the samples!
 
-Source at https://github.com/yowl/Particles
+Source at https://github.com/yowl/wasm_webgpu
 
