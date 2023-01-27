@@ -4895,7 +4895,9 @@ function canvas_get_height() { return canvas.height; }
           
           getWasmTableEntry(adapterCallback)(wgpuStore(adapter), userData);
         }
-        gpu['requestAdapter'](opts).then(cb).catch(()=>{cb(/*intentionally omit arg to pass undefined*/)});
+        gpu['requestAdapter'](opts).then(cb).catch(
+          (e)=>{console.error(`navigator.gpu.requestAdapter() Promise failed: ${e}`); cb(/*intentionally omit arg to pass undefined*/)}
+        );
         return 1/*EM_TRUE*/;
       }
       
@@ -4967,7 +4969,9 @@ function canvas_get_height() { return canvas.height; }
           },
           'GPUAdapter.requestDevice() with desc'
         )
-      ).then(cb).catch(()=>{cb(/*intentionally omit arg to pass undefined*/)});
+      ).then(cb).catch(
+        (e)=>{console.error(`GPUAdapter.requestDevice() Promise failed: ${e}`); cb(/*intentionally omit arg to pass undefined*/)}
+      );
     }
 
   function _wgpu_buffer_get_mapped_range(gpuBuffer, offset, size) {
@@ -4975,7 +4979,10 @@ function canvas_get_height() { return canvas.height; }
       assert(gpuBuffer != 0, "assert(gpuBuffer != 0) failed!");
       assert(wgpu[gpuBuffer], "assert(wgpu[gpuBuffer]) failed!");
       assert(wgpu[gpuBuffer] instanceof GPUBuffer, "assert(wgpu[gpuBuffer] instanceof GPUBuffer) failed!");
+      assert(Number.isSafeInteger(offset), "assert(Number.isSafeInteger(offset)) failed!");
       assert(offset >= 0, "assert(offset >= 0) failed!");
+      assert(Number.isSafeInteger(size), "assert(Number.isSafeInteger(size)) failed!");
+      assert(size >= -1, "assert(size >= -1) failed!");
   
       
       gpuBuffer = wgpu[gpuBuffer];
@@ -5011,13 +5018,17 @@ function canvas_get_height() { return canvas.height; }
       assert(wgpu[gpuBuffer], "assert(wgpu[gpuBuffer]) failed!");
       assert(wgpu[gpuBuffer] instanceof GPUBuffer, "assert(wgpu[gpuBuffer] instanceof GPUBuffer) failed!");
       assert(wgpu[gpuBuffer].mappedRanges[startOffset], "assert(wgpu[gpuBuffer].mappedRanges[startOffset]) failed!");
+      assert(Number.isSafeInteger(startOffset), "assert(Number.isSafeInteger(startOffset)) failed!");
+      assert(startOffset >= 0, "assert(startOffset >= 0) failed!");
+      assert(Number.isSafeInteger(subOffset), "assert(Number.isSafeInteger(subOffset)) failed!");
+      assert(subOffset >= 0, "assert(subOffset >= 0) failed!");
+      assert(Number.isSafeInteger(size), "assert(Number.isSafeInteger(size)) failed!");
       assert(size >= 0, "assert(size >= 0) failed!");
       assert(src || size == 0, "assert(src || size == 0) failed!");
-      assert(subOffset >= 0, "assert(subOffset >= 0) failed!");
   
       // Here 'buffer' refers to the global Wasm memory buffer.
       // N.b. generates garbage.
-      new Uint8Array(wgpu[gpuBuffer].mappedRanges[startOffset]).set(new Uint8Array(buffer, src, size), subOffset);
+      new Uint8Array(wgpu[gpuBuffer].mappedRanges[startOffset]).set(new Uint8Array(HEAPU8.buffer, src, size), subOffset);
     }
 
   var HTMLPredefinedColorSpaces = [,"srgb","display-p3"];
@@ -5062,6 +5073,7 @@ function canvas_get_height() { return canvas.height; }
 
   function _wgpu_object_destroy(object) {
       let o = wgpu[object];
+      assert(o || !wgpu.hasOwnProperty(object), 'wgpu dictionary should never be storing key-values with null/undefined value in it', "assert(o || !wgpu.hasOwnProperty(object), 'wgpu dictionary should never be storing key-values with null/undefined value in it') failed!");
       if (o) {
         // WebGPU objects of type GPUDevice, GPUBuffer, GPUTexture and GPUQuerySet have an explicit .destroy() function. Call that if applicable.
         if (o['destroy']) o['destroy']();
@@ -5070,7 +5082,7 @@ function canvas_get_height() { return canvas.height; }
         // Finally erase reference to this object.
         delete wgpu[object];
       }
-      assert(!(object in wgpu), 'wgpu dictionary should not be storing nulls/undefineds/zeroes!', "assert(!(object in wgpu), 'wgpu dictionary should not be storing nulls/undefineds/zeroes!') failed!");
+      assert(!wgpu.hasOwnProperty(object), 'object should have gotten deleted', "assert(!wgpu.hasOwnProperty(object), 'object should have gotten deleted') failed!");
     }
   function _wgpu_canvas_context_get_current_texture(canvasContext) {
       
@@ -5093,9 +5105,7 @@ function canvas_get_height() { return canvas.height; }
       assert(!canvasContext.derivedObjects || canvasContext.derivedObjects.length < 1000, "assert(!canvasContext.derivedObjects || canvasContext.derivedObjects.length < 1000) failed!");
       if (canvasContext != wgpu[1]) {
         // ... and destroy previous special canvas context texture, if it was an old one.
-        if (wgpu[1] !== undefined) {
-          _wgpu_object_destroy(1);
-        }
+        _wgpu_object_destroy(1);
         wgpu[1] = canvasContext;
         canvasContext.wid = 1;
         canvasContext.derivedObjects = []; // GPUTextureViews are derived off of GPUTextures
@@ -5198,6 +5208,9 @@ function canvas_get_height() { return canvas.height; }
         colorAttachmentsIdx += 12;
         colorAttachmentsIdxDbl += 6;
       }
+  
+      assert(Number.isSafeInteger(HEAPF64[descriptor+10>>1]), "assert(Number.isSafeInteger(HEAPF64[descriptor+10>>1])) failed!"); // 'maxDrawCount' is a double_int53_t
+      assert(HEAPF64[descriptor+10>>1] >= 0, "assert(HEAPF64[descriptor+10>>1] >= 0) failed!");
   
       return wgpuStore(
         debugDir(
@@ -5427,6 +5440,9 @@ function canvas_get_height() { return canvas.height; }
           fragmentModule = HEAPU32[fragmentIdx],
           pipelineLayoutId = HEAPU32[fragmentIdx+6],
           desc;
+  
+      assert(pipelineLayoutId <= 1/*"auto"*/ || wgpu[pipelineLayoutId], "assert(pipelineLayoutId <= 1/*'auto'*/ || wgpu[pipelineLayoutId]) failed!");
+      assert(pipelineLayoutId <= 1/*"auto"*/ || wgpu[pipelineLayoutId] instanceof GPUPipelineLayout, "assert(pipelineLayoutId <= 1/*'auto'*/ || wgpu[pipelineLayoutId] instanceof GPUPipelineLayout) failed!");
   
       // Read GPUVertexState
       assert(numVertexBuffers >= 0, "assert(numVertexBuffers >= 0) failed!");
@@ -5677,7 +5693,7 @@ function canvas_get_height() { return canvas.height; }
       assert(wgpu[encoder], "assert(wgpu[encoder]) failed!");
       assert(wgpu[encoder] instanceof GPUComputePassEncoder || wgpu[encoder] instanceof GPURenderPassEncoder || wgpu[encoder] instanceof GPURenderBundleEncoder, "assert(wgpu[encoder] instanceof GPUComputePassEncoder || wgpu[encoder] instanceof GPURenderPassEncoder || wgpu[encoder] instanceof GPURenderBundleEncoder) failed!");
       assert(wgpu[pipeline] instanceof GPURenderPipeline || wgpu[pipeline] instanceof GPUComputePipeline, "assert(wgpu[pipeline] instanceof GPURenderPipeline || wgpu[pipeline] instanceof GPUComputePipeline) failed!");
-      // assert((wgpu[encoder] instanceof GPUComputePassEncoder) == (wgpu[pipeline] instanceof GPUComputePipeline), "assert((wgpu[encoder] instanceof GPUComputePassEncoder) == (wgpu[pipeline] instanceof GPUComputePipeline)) failed!");
+      assert((wgpu[encoder] instanceof GPUComputePassEncoder) == (wgpu[pipeline] instanceof GPUComputePipeline), "assert((wgpu[encoder] instanceof GPUComputePassEncoder) == (wgpu[pipeline] instanceof GPUComputePipeline)) failed!");
       wgpu[encoder]['setPipeline'](wgpu[pipeline]);
     }
 
@@ -5791,6 +5807,10 @@ function canvas_get_height() { return canvas.height; }
       assert(wgpu[passEncoder], "assert(wgpu[passEncoder]) failed!");
       assert(wgpu[passEncoder] instanceof GPURenderPassEncoder || wgpu[passEncoder] instanceof GPURenderBundleEncoder, "assert(wgpu[passEncoder] instanceof GPURenderPassEncoder || wgpu[passEncoder] instanceof GPURenderBundleEncoder) failed!");
       assert(wgpu[buffer] instanceof GPUBuffer, "assert(wgpu[buffer] instanceof GPUBuffer) failed!");
+      assert(Number.isSafeInteger(offset), "assert(Number.isSafeInteger(offset)) failed!");
+      assert(offset >= 0, "assert(offset >= 0) failed!");
+      assert(Number.isSafeInteger(size), "assert(Number.isSafeInteger(size)) failed!");
+      assert(size >= -1, "assert(size >= -1) failed!");
   
       // Awkward API polymorphism: must omit size parameter altogether (instead of specifying e.g. -1 for whole buffer)
       size < 0 ? wgpu[passEncoder]['setVertexBuffer'](slot, wgpu[buffer], offset)
